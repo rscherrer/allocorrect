@@ -1,0 +1,19 @@
+Package: allocorrect
+Title: Allometric Adjustment for Multi-Group Data
+Version: 0.1
+Authors@R: 
+    person(
+      given = "Raphaël",
+      family = "Scherrer",
+      email = "r.scherrer@rug.nl",
+      role = c("aut", "cre"),
+      comment = c(ORCID = "0000-0002-1447-7630")
+    )
+Description: This package implemens some correction tools for morphometric variables
+  that are allometrically linked to some undderlying confounding variable, such as 
+  body size. It attempts at correcting caveats that arise in previous methods when
+  multiple groups are considered and compared, such as in studies of sexual dimorphism
+  in traits that must first be corrected for body size.
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3

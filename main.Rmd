@@ -294,7 +294,7 @@ As you may have seen on the last plot, after transforming the data the relations
 
 ## 7. Future avenues
 
-More than two groups? Make this a package? Or a paper? 
+More than two groups? Or multiple instances of the same analysis that must be compared? Make this a package? Or a paper? 
 
 ## 8. Specifications
 
