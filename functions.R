@@ -214,3 +214,44 @@ plot_data <- function(
   plot + geom_hline(yintercept = 0, linetype = 2L) + ylab("Corrected y")
   
 }
+
+# Function to actually perform the correction on a data set
+correct_data <- function(
+    
+  data, transform = NULL, linear = TRUE, separate = TRUE
+  
+) {
+  
+  # data: the data set
+  # transform: transformation function to re-scale the vertical axis
+  # linear: whether the lines should be straight or allometric
+  # separate: whether the mid-line should be an aggregate of both sexes (otherwise a global regression)
+  
+  # Note: by default this function aggregates both sexes as it is the recommended
+  # option.
+  
+  # Transform the data if needed
+  if (!is.null(transform)) data <- data %>% mutate(y = transform(y))
+  
+  # Function to control the shape of the relationship
+  fun <- function(x) if (linear) x else log10(x)
+  
+  # Find the right relationship for each sex
+  fit <- lm(fun(y) ~ fun(x) * sex, data)
+  
+  # Extract expected values
+  preds <- get_predictions(fit, data, linear)
+
+  # Find the mid-line
+  mid_fit <- lm(fun(y) ~ fun(x), data)
+  
+  # Pick the relevant model to extract predictions from 
+  this_fit <- if (separate) fit else mid_fit
+  
+  # Generate the mid-line
+  mid_preds <- get_predictions(this_fit, data, linear, separate)
+  
+  # Correct the data
+  data %>% mutate(y = y - mid_prds)
+  
+}

@@ -270,11 +270,33 @@ plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = 
 
 Tadaaa!
 
-## 5. Future avenues
+## 5. The workflow
 
-More than two groups? Make this a package? Or a paper?
+So how does this work in practice? Here's a summary of the approach (we provide the function `correct_data()` to do all that):
 
-## 6. Specifications
+1. Plot the data against the variable to correct for
+2. Get a feel for what kind of relationship that is
+3. Find the right transformation that makes the group-specific trends parallel-ish
+4. Apply that transformation
+5. Fit (non-necessarily linear) regressions through each group
+6. Come up with a mid-line between those regressions
+7. Compute the deviations of each data point to that line
+
+And then do whatever you were intending to do on those data once the confounding variable has been corrected away (e.g. computing the average male-female difference as a proxy for sexual dimorphism in that population).
+
+Note here that you can come up with the mid-line by doing a global regression (instead of finding the midpoint between group-specific regressions), it is just ill-advised if the data are heterogenously distributed along the horizontal axis. Using a global regression may actually be advisable when a group, for example, is too small for its group-specific regression to be reliably estimated. 
+
+Also note that while the mid-line is sort of a measure of central tendency against which to measure deviations from, in effect any baseline reference may work as long as the trends are more-or-less parallel in all groups (e.g. the regression line for females could serve as a reference instead of the mid-line).
+
+## 6. Disclaimer
+
+As you may have seen on the last plot, after transforming the data the relationship with body size is almost parallel, but not quite exactly. In a real data set, there is a chance that no transformation will be found that makes the relationship parallel. We recommend that you try, but there is not guarantee that the approach we proposed will always solve the problems we mentioned above.
+
+## 7. Future avenues
+
+More than two groups? Make this a package? Or a paper? 
+
+## 8. Specifications
 
 This report was generated with the following specifications:
 
