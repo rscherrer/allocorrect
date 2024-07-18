@@ -58,4 +58,6 @@ correct_data <- function(
   # Correct the data
   data$y <- data$y - mid_preds
   
+  return(data)
+  
 }
