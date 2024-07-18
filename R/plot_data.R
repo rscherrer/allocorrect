@@ -118,7 +118,7 @@ plot_data <- function(
   if (!correct & !refit) return(plot)
   
   # If we must re-fit the model...
-  if (refit) {
+  if (!is.null(transform) & refit) {
     
     # Same regression as the original one by default
     if (is.na(linear_refit)) linear_refit <- linear
