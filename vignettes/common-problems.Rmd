@@ -1,0 +1,305 @@
+---
+title: "Problems with allometric adjustment when allometric relationships differ among groups"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{common-problems}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## 1. Background
+
+Here we are concerned with correcting for allometric relationships in morphometric analyses. Many traits are correlated with body size, for example, and studying variation in such metrics must account for the fact that part of the differences we see are due to differences in some underlying quantity (e.g. body size) through allometry. For example, do male lizards have wider heads than females just because they are bigger? Or is there something more that body size does not account for?
+
+Many ways have been proposed to correct for body size, such as dividing by body size, taking the residuals of a linear regression against body size, or principal component analysis. All of these methods suffer from problems, as outlined by Chan and Grismer (2022), who recently proposed to resurrect a "proper" allometric correction already shows as superior in the 80s, and which is based on a logarithmic regression. 
+
+However, this method, together with all the previous ones, suffers from some important caveats that become apparent when studying (and comparing) multiple groups (1) that differ in their allometric relationship with the horizontal axis and/or (2) that do not occupy the same range along the horizontal axis. Here we argue that these two problems cause all of the proposed corrections to be misleading in the context of group comparison (e.g. studies of sexual dimorphism where the groups are males and females), pretty much for the same reasons.
+
+We will cover both in order with examples. In what follows, we will use male-female differences as our main working example.
+
+```{r, message = FALSE}
+# But first we setup R
+rm(list = ls())
+
+library(allocorrect)
+
+ggplot2::theme_set(ggplot2::theme_classic())
+
+set.seed(42) # for reproducibility
+```
+
+## 2. The no-problem case
+
+Let us start with an example where there is no problem. The allometric relationship is the same between the sexes, and both males and females cover the entire range of body sizes, or variable `x`. We simulate data for males and females using some accessory function we have created (whose source code the reader can check in `functions.R` but that is not the point here).
+
+```{r}
+# Let us first simulate some data
+data <- simulate_data(intercept_f = 0.1, intercept_m = 10, slope_f = 0.5, slope_m = 0.5, sd_y = 1)
+
+# Check them out
+data
+```
+
+If we plot that...
+
+```{r}
+# Plot
+plot_data(data)
+```
+
+As you can see we have a variable `x`, which will serve as our horizontal axis, and variable `y` that is related to `x` and differs between the sexes. (The straight lines are linear regressions for each sex.) This case is not a problem in the sense that if we draw a single straight line through the whole dataset and compute the deviation of male and female `y` to that line, we essentially remove the effect of `x`. If we perform a global regression through the entire data...
+
+```{r}
+# Here is the global straight line
+plot_data(data, midline = TRUE)
+```
+
+And then look at the deviations between `y` and that straight line...
+
+```{r}
+# Plot the corrected values
+plot_data(data, midline = TRUE, correct = TRUE)
+```
+
+We see that the relationship with `x` has been successfully removed but there still are male-female differences. That is our sexual dimorphism that is not accounted for by body size! Hence, in that case using residuals of a global regression analysis is fine to remove the effect of body size differences between the sexes.
+
+## 3. Differences in scaling
+
+Things get more complicated when the relationship (irrespective of intercept) is not the same between the groups. This could be e.g. a non-linear, allometric relationship, where `y` increases faster with body size in males than in females. Let us simulate some non-linear data.
+
+```{r}
+# Simulate non-linear relationship this time
+data_nl <- simulate_data(intercept_f = 0.1, intercept_m = 10, slope_f = 0.5, slope_m = 0.5, sd_y = 1, fun = function(x) exp(x / 7))
+
+# Note: the `fun` argument allows us to transform otherwise linear data.
+```
+
+Here, we transformed the previously linear data into some exponential-looking data.
+
+```{r}
+# Plot the allometric data
+plot_data(data_nl, midline = TRUE, linear = FALSE)
+
+# Note: setting `linear` to FALSE makes sure we fit an allometric model and not a linear one
+```
+
+The lines are now fitted using an allometric model, which has been regarded as the best correction for allometry even for linear relationships (see Chan and Grismer, 2022). Indeed, those lines go pretty well through both sexes, but fitting a global regression and taking deviations from it gives us the following: 
+
+```{r}
+# Plot the corrected allometric data
+plot_data(data_nl, midline = TRUE, correct = TRUE, linear = FALSE)
+```
+
+Which is less than ideal as it did not remove the relationship with body size `x`. The reason for that is that as `x` increases, the gap between the sexes becomes wider and therefore, so does their respective distance from the global regression. The allometry has not been corrected away because the trend with `x` is different between the sexes.
+
+Transforming the data so that the relationship looks similar between the sexes therefore sounds like a good solution to that problem. Since the relationship is allometric, what does log-transforming do, for example?
+
+```{r}
+# Plot on a log-scale
+plot_data(data_nl, midline = TRUE, linear = FALSE, transform = log, inverse = exp)
+
+# Note: we have to provide the `inverse` of the re-scaling function.
+```
+
+Now the relationship with `x` seems to be approximately identical in both sexes, which is what we want, because it means that if we now correct for `x`, then the relationship with `x` should be gone and only a male-female offset remain.
+
+```{r}
+# Correct the transformed data
+plot_data(data_nl, midline = TRUE, linear = FALSE, correct = TRUE, transform = log, inverse = exp)
+```
+
+Tadaaa! Actually, we could do even better, as we see that the relationship now looks linear but our re-scaled prediction does not seem to capture exactly that relationship (it is curved). What if we re-fit a regression after transforming the data?
+
+```{r}
+# Re-fit after transforming
+plot_data(data_nl, midline = TRUE, linear = FALSE, transform = log, inverse = exp, refit = TRUE)
+```
+
+The regressions seem to fit better. What happens when we correct for `x`?
+
+```{r}
+# Correct
+plot_data(data_nl, midline = TRUE, linear = FALSE, transform = log, inverse = exp, refit = TRUE, correct = TRUE)
+```
+
+We can also choose to fit a linear regression instead of an allometric one the second time around, since the data look quite linear. This would give us:
+
+```{r}
+# Correct
+plot_data(data_nl, midline = TRUE, linear = FALSE, transform = log, inverse = exp, refit = TRUE, linear_refit = TRUE, correct = TRUE)
+
+# Note: this was done with `linear_refit`.
+```
+
+Pretty god damn perfect.
+
+Note that here we were lucky in the sense that the log-transformation we picked did the job in making the two sex-specific lines parallel to each other, such that when we corrected `x` away we were only left with an offset. But in practice, we may need to tinker around more to find the right transformation. For example, the function `log(x) / (1 + log(x))` has a stronger effect than `log(x)` in reducing high values, in case the latter did not do the job. Also note that this transformation need not make the relationship linear: what matters is that the trend is the same in the two sexes, so that we can measure an offset that is more-or-less the same along the `x` axis.
+
+## 3. Heterogeneity along the horizontal axis 
+
+This brings us to the second problem, that of unequal spread of the data along the horizontal axis. This is a common feature in biological data sets, especially when it comes to sex differences. For example, males may have wider heads than females, but they may also be bigger than females. So, how much the dimorphism in head shape can be explained simply by an allometric relationship with body size? Consider the following data set:
+
+```{r}
+# Simulate heterogeneity along the horizontal axis
+data_hg <- simulate_data(intercept_f = 0.1, intercept_m = 10, slope_f = 0.2, slope_m = 0.2, sd_y = 1, homogeneity = 0.4)
+
+# Plot heterogeneous data
+plot_data(data_hg)
+
+# Note: `homogeneity` shrinks one sex to the left and the other to the right
+# when smaller than one
+```
+
+For the sake of the example we have simulated linear relationships with identical slopes in both sexes. What happens if we fit a global regression through both sexes?
+
+```{r}
+# Fit a global regression
+plot_data(data_hg, midline = TRUE)
+```
+
+As you may have expected, the global regression passes through both sexes, but is very much not parallel to the sex-specific lines, which represent the true scaling relationship between `x` and `y`. Because of heterogeneity of the groups along the horizontal axis, the effect of `x` that the global regression aims to capture is grossly over-estimated.
+
+This means that when we correct for this "wrong" relationship with `x`, we get:
+
+```{r}
+# Plot the corrected data
+plot_data(data_hg, midline = TRUE, correct = TRUE)
+```
+
+Which does not remove the scaling with `x` at all.
+
+And so, when both sexes covered the same range on the horizontal axis, a global regression managed to capture the "true" relationship between `x` and `y`. That is no longer the case when both sexes do not overlap along `x`.
+
+To solve that problem, we must use something else than a global regression to estimate this "true" relationship. We clearly see this relationship when we look at each sex separately, so what if we found a middle ground between these two?
+
+```{r}
+# With middle ground
+plot_data(data_hg, midline = TRUE, separate = TRUE)
+```
+
+This looks much better, and if we now correct for `x`:
+
+```{r}
+# Correct
+plot_data(data_hg, midline = TRUE, separate = TRUE, correct = TRUE)
+```
+
+The dependency on `x` is gone and what is left is the sexual dimorphism between males and females!
+
+## 4. Combining problems
+
+Let us now combine both problems into one, very problematic data set where not only are the (non-linear) relationships of `y` with `x` different in both sexes but in addition, both sexes are unequally distributed along the horizontal axis.
+
+```{r}
+# Simulate problematic data
+data_pb <- simulate_data(intercept_f = 0.1, intercept_m = 0.5, slope_f = 0.5, slope_m = 2, fun = function(x) exp(x / 30), homogeneity = 0.7)
+
+# Plot
+plot_data(data_pb, linear = FALSE)
+```
+
+What is the sex difference that is not attributable to differences in body size in this data set where the sexes differ not only in body size but also in how `y` scales with body size?
+
+Well, we can combine the techniques we have seen above.
+
+First, we have heterogeneous data, so we know that we should use a mid-line between the two separate regressions rather than a global regression. 
+
+```{r}
+# Plot with mid-line
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE)
+```
+
+But the relationship is different in males and females so the correction will not work...
+
+```{r}
+# Correct
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, correct = TRUE)
+```
+
+This suggests we must transform the scale of the data. What about a log-transformation?
+
+```{r}
+# Log-transform
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = log, inverse = exp)
+```
+
+This is better, but not great, as the relationship with `x` is still present in the corrected data:
+
+```{r}
+# Correct
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = log, inverse = exp, correct = TRUE)
+```
+
+A transformation by the function `log(x) / (1 + log(x))` seems more appropriate.
+
+```{r}
+# New transformation
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = function(x) log(x) / (1 + log(x)), inverse = function(y) exp(y / (1 - y)))
+
+# Note: exp(y / (1 - y)) is the inverse of log(x) / (1 + log(x)).
+```
+
+However, the corrected data still does not look optimal:
+
+```{r}
+# Correct
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = function(x) log(x) / (1 + log(x)), inverse = function(y) exp(y / (1 - y)), correct = TRUE)
+```
+
+But that is because we have not re-fitted the model after transforming the data. What if we do that?
+
+```{r}
+# Re-fit after transforming
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = function(x) log(x) / (1 + log(x)), inverse = function(y) exp(y / (1 - y)), refit = TRUE)
+```
+
+This looks much better. And again, the relationship looks linear on this new scale so we might as well include that when we re-fit the model.
+
+```{r}
+# Linear re--fitting
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = function(x) log(x) / (1 + log(x)), inverse = function(y) exp(y / (1 - y)), refit = TRUE, linear_refit = TRUE)
+```
+
+If we now correct for `x`:
+
+```{r}
+# Correct
+plot_data(data_pb, linear = FALSE, midline = TRUE, separate = TRUE, transform = function(x) log(x) / (1 + log(x)), inverse = function(y) exp(y / (1 - y)), refit = TRUE, linear_refit = TRUE, correct = TRUE)
+```
+
+Tadaaa!
+
+## 5. The workflow
+
+So how does this work in practice? Here's a summary of the approach (we provide the function `correct_data()` to do all that):
+
+1. Plot the data against the variable to correct for
+2. Get a feel for what kind of relationship that is
+3. Find the right transformation that makes the group-specific trends parallel-ish
+4. Apply that transformation
+5. Fit (non-necessarily linear) regressions through each group
+6. Come up with a mid-line between those regressions
+7. Compute the deviations of each data point to that line
+
+And then do whatever you were intending to do on those data once the confounding variable has been corrected away (e.g. computing the average male-female difference as a proxy for sexual dimorphism in that population).
+
+Note here that you can come up with the mid-line by doing a global regression (instead of finding the midpoint between group-specific regressions), it is just ill-advised if the data are heterogenously distributed along the horizontal axis. Using a global regression may actually be advisable when a group, for example, is too small for its group-specific regression to be reliably estimated. 
+
+Also note that while the mid-line is sort of a measure of central tendency against which to measure deviations from, in effect any baseline reference may work as long as the trends are more-or-less parallel in all groups (e.g. the regression line for females could serve as a reference instead of the mid-line).
+
+## 6. Disclaimer
+
+As you may have seen on the last plot, after transforming the data the relationship with body size is almost parallel, but not quite exactly. In a real data set, there is a chance that no transformation will be found that makes the relationship parallel. We recommend that you try, but there is not guarantee that the approach we proposed will always solve the problems we mentioned above.
+
+## 7. Future avenues
+
+More than two groups? Or multiple instances of the same analysis that must be compared? Variances? Make this a package? Or a paper? 
+
+## 8. Specifications
+
+This report was generated with the following specifications:
+
+```{r}
+# Show session information
+sessionInfo()
+```
